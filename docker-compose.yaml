@@ -10,7 +10,7 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - ./sql:/sql
+      - ./:/docker-entrypoint-initdb.d
       - instagram-volume:/var/lib/postgresql/data/
     networks:
       - instagram-network
