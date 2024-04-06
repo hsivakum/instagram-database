@@ -121,6 +121,7 @@ func main() {
 	hashTags := map[string]*int64{}
 	allTags := []string{}
 	highlights := []*models.Highlight{}
+	highlightSet := map[string]*models.Highlight{}
 	for _, data := range collection {
 		userID := uuid.NewString()
 		user := &models.User{
@@ -174,11 +175,15 @@ func main() {
 		}
 
 		for _, highlight := range data.Highlights {
-			highlights = append(highlights, &models.Highlight{
+			highlightSet[fmt.Sprintf("%s_%s", userID, highlight.Title)] = &models.Highlight{
 				UserID: userID,
 				Title:  highlight.Title,
 				Image:  highlight.Image,
-			})
+			}
+		}
+
+		for _, v := range highlightSet {
+			highlights = append(highlights, v)
 		}
 	}
 
