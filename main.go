@@ -1,24 +1,31 @@
 package main
 
 import (
-	"data-loader/models"
+	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	_ "github.com/lib/pq"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/google/uuid"
+	_ "github.com/lib/pq"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+
+	"data-loader/models"
 )
 
 func init() {
 	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname='%s' sslmode=disable", "localhost", "5432", "SYS", "instaadmin", "")
 	var err error
 	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	rawDB, err = db.DB()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,7 +86,8 @@ type Data struct {
 }
 
 var (
-	db *gorm.DB
+	db    *gorm.DB
+	rawDB *sql.DB
 )
 
 func main() {
@@ -181,10 +189,10 @@ func main() {
 				Image:  highlight.Image,
 			}
 		}
+	}
 
-		for _, v := range highlightSet {
-			highlights = append(highlights, v)
-		}
+	for _, v := range highlightSet {
+		highlights = append(highlights, v)
 	}
 
 	tagSet := map[string]bool{}
@@ -216,6 +224,122 @@ func main() {
 	createPostTagsConcurrently(postTags, allTags, postCaption, hashTags)
 
 	createHighlights(highlights)
+
+	createFollowers()
+}
+
+func createFollowers() {
+	// Query for user IDs and their follower and following counts
+	rows, err := rawDB.Query("SELECT id, following_count, followers_count FROM users")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer rows.Close()
+
+	type User struct {
+		UserID         string
+		FollowingCount int
+		FollowersCount int
+	}
+
+	users := []User{}
+	followers := []*models.Follower{}
+
+	// Iterate through each user and randomly generate follower relationships
+	for rows.Next() {
+		var user User
+		if err := rows.Scan(&user.UserID, &user.FollowingCount, &user.FollowersCount); err != nil {
+			log.Fatal(err)
+		}
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	followersMap := map[string]bool{}
+
+	for _, user := range users {
+		// Generate follower relationships based on following and followers count
+		followingIDs := generateRandomUserIDs(user.UserID, user.FollowingCount, rawDB, false)
+		for _, id := range followingIDs {
+			key := fmt.Sprintf("%s_%s", user.UserID, id)
+			if _, ok := followersMap[key]; !ok {
+				followersMap[key] = true
+				follower := &models.Follower{
+					FollowerID:  user.UserID,
+					FollowingID: id,
+				}
+				followers = append(followers, follower)
+			}
+		}
+
+		followersIDs := generateRandomUserIDs(user.UserID, user.FollowersCount, rawDB, false)
+		for _, id := range followersIDs {
+			key := fmt.Sprintf("%s_%s", id, user.UserID)
+			if _, ok := followersMap[key]; !ok {
+				followersMap[key] = true
+				follower := &models.Follower{
+					FollowerID:  id,
+					FollowingID: user.UserID,
+				}
+				followers = append(followers, follower)
+			}
+		}
+	}
+
+	tx := db.CreateInBatches(followers, 10000)
+	if tx.Error != nil {
+		log.Fatal(tx.Error)
+	}
+
+	tx = db.Raw(`UPDATE users AS u
+SET
+    following_count = (
+        SELECT COUNT(*)
+        FROM followers AS f
+        WHERE f.follower_id = u.id
+    ),
+    followers_count = (
+        SELECT COUNT(*)
+        FROM followers AS f
+        WHERE f.following_id = u.id
+    )`)
+
+	if tx.Error != nil {
+		log.Fatal(tx.Error)
+	}
+
+	fmt.Println("Follower relationships have been generated successfully!")
+}
+
+// Function to generate random user IDs based on following or followers
+func generateRandomUserIDs(excludeID string, count int, db *sql.DB, includeSelf bool) []string {
+	var userIDs []string
+	var query string
+	// Exclude the current user from the random selection
+	query = fmt.Sprintf("SELECT id FROM users WHERE id != $1 ORDER BY random() LIMIT %d", count)
+	// Query for random user IDs based on the condition
+	rows, err := db.Query(query, excludeID)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			log.Fatal(err)
+		}
+		userIDs = append(userIDs, userID)
+	}
+	if err := rows.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	return userIDs
 }
 
 func createUser(users []*models.User) {
@@ -275,7 +399,6 @@ func createPostTagsConcurrently(postTags []*models.PostTag, allTags []string, po
 
 	// Start worker goroutines
 	for _, tag := range allTags {
-		log.Printf("running tag %s", tag)
 		go func(tag string) {
 			defer wg.Done()
 			worker(tag, postCaption, hashTags, resultCh)
