@@ -231,6 +231,54 @@ func main() {
 	createFollowers()
 
 	createComments()
+
+	createPostLikes()
+}
+
+func createPostLikes() {
+	var posts []*models.Post
+	err := db.Model(&models.Post{}).Select("id", "likes_count", "user_id").Where("likes_count > 0").Scan(&posts).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var likes []*models.PostLikes
+	for _, post := range posts {
+		var followingUsers []models.Follower
+		err := db.Model(&models.Follower{}).Select("follower_id").Where("following_id = ?", post.UserID).Scan(&followingUsers).Error
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		selectedUsers := []models.Follower{}
+		if int64(len(followingUsers)) > post.LikesCount {
+			selectedUsers = followingUsers[:post.LikesCount]
+		}
+
+		for _, user := range selectedUsers {
+			likes = append(likes, &models.PostLikes{
+				PostID: *post.ID,
+				UserID: user.FollowerID,
+			})
+		}
+	}
+
+	err = db.CreateInBatches(likes, 10000).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = rawDB.Exec(`UPDATE posts AS p
+	SET likes_count = (
+		SELECT COUNT(*)
+		FROM post_likes AS pl
+		WHERE pl.post_id = p.id
+	)`)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Post likes successfully created")
 }
 
 func createFollowers() {

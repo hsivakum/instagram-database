@@ -344,3 +344,16 @@ create table comment_activity
     created_at timestamptz default current_timestamp not null
 );
 
+create table post_likes
+(
+    post_id  bigint                                not null
+        constraint post_likes_posts_id_fk
+            references public.posts,
+    user_id  uuid                                  not null
+        constraint post_likes_users_id_fk
+            references public.users,
+    liked_at timestamptz default current_timestamp not null,
+    constraint post_likes_pk
+        primary key (post_id, user_id)
+);
+

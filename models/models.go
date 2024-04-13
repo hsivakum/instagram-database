@@ -235,3 +235,11 @@ type CommentActivity struct {
 	Comment   Comment   `gorm:"foreignKey:CommentID"`
 	User      User      `gorm:"foreignKey:ActionBy"`
 }
+
+type PostLikes struct {
+	PostID  int64     `gorm:"primaryKey"`
+	UserID  string    `gorm:"primaryKey"`
+	LikedAt time.Time `gorm:"autoCreateTime"`
+	Post    Post      `gorm:"foreignKey:PostID"`
+	User    User      `gorm:"foreignKey:UserID"`
+}
