@@ -207,16 +207,16 @@ type RestrictActivity struct {
 }
 
 type Comment struct {
-	ID              int64  `gorm:"primaryKey"`
-	PostID          int64  `gorm:"index"`
-	UserID          string `gorm:"index"`
+	ID              int64  `gorm:"primaryKey" json:"-"`
+	PostID          int64  `gorm:"index" json:"-"`
+	UserID          string `gorm:"index" json:"-"`
 	ParentCommentID int64
-	CommentText     string     `gorm:"not null"`
-	CreatedAt       time.Time  `gorm:"autoCreateTime"`
-	UpdatedAt       *time.Time `gorm:"autoUpdateTime"`
-	DeletedAt       *time.Time `gorm:"index"`
-	Post            Post       `gorm:"foreignKey:PostID"`
-	User            User       `gorm:"foreignKey:UserID"`
+	CommentText     string     `gorm:"not null" json:"comment_text"`
+	CreatedAt       time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt       *time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt       *time.Time `gorm:"index" json:"deleted_at"`
+	Post            Post       `gorm:"foreignKey:PostID" json:"-"`
+	User            User       `gorm:"foreignKey:UserID" json:"-"`
 }
 
 type CommentLike struct {

@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
@@ -91,6 +93,7 @@ var (
 )
 
 func main() {
+
 	file, err := os.ReadFile("instagram_profiles_Github Hashtag_dataset.json")
 	if err != nil {
 		log.Fatal(err)
@@ -226,6 +229,8 @@ func main() {
 	createHighlights(highlights)
 
 	createFollowers()
+
+	createComments()
 }
 
 func createFollowers() {
@@ -313,6 +318,72 @@ SET
 	}
 
 	fmt.Println("Follower relationships have been generated successfully!")
+}
+
+func createComments() {
+	var commentsStore []*models.Comment
+	file, err := os.Open("comments.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	err = json.NewDecoder(file).Decode(&commentsStore)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var totalComments int
+	err = db.Model(&models.Post{}).Select("sum(comments_count) as total_comments").Scan(&totalComments).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	requiredComments := commentsStore[:totalComments]
+
+	var posts []models.Post
+	tx := db.Model(&models.Post{}).Select("comments_count", "id", "user_id").Where("comments_count > 0").Scan(&posts)
+	if tx.Error != nil {
+		log.Fatal(tx.Error)
+	}
+
+	finalComments := []*models.Comment{}
+
+	postComments := map[int64][]*models.Comment{}
+	start := int64(0)
+	counter := int64(1)
+	for _, post := range posts {
+		var followingUsers []models.Follower
+		err := db.Model(&models.Follower{}).Select("follower_id").Where("following_id = ?", post.UserID).Scan(&followingUsers).Error
+		if err != nil {
+			log.Fatal(err)
+		}
+		selectedComments := requiredComments[start : start+post.CommentsCount]
+		for i, comment := range selectedComments {
+			rand.Seed(time.Now().UnixNano())
+			index := rand.Intn(len(followingUsers))
+			comment.UserID = followingUsers[index].FollowerID
+			comment.PostID = *post.ID
+			selectedComments[i] = comment
+			comment.ID = counter
+			counter = counter + 1
+		}
+
+		postComments[*post.ID] = selectedComments
+		finalComments = append(finalComments, selectedComments...)
+		start = start + post.CommentsCount
+	}
+
+	for _, v := range postComments {
+		fillParentCommentID(v)
+	}
+
+	tx = db.CreateInBatches(finalComments, 8190)
+	if tx.Error != nil {
+		log.Fatal(tx.Error)
+	}
+
+	log.Println("Comments successfully loaded")
 }
 
 // Function to generate random user IDs based on following or followers
@@ -428,5 +499,18 @@ func worker(tag string, postCaption map[*int64]string, hashTags map[string]*int6
 				TagID:  *hashTags[tag],
 			}
 		}
+	}
+}
+
+// Function to fill in parent_comment_id for comments based on a binary tree structure
+func fillParentCommentID(comments []*models.Comment) {
+	// Shuffle comment IDs
+	rand.Shuffle(len(comments), func(i, j int) {
+		comments[i], comments[j] = comments[j], comments[i]
+	})
+
+	// Build parent_comment_id based on shuffled IDs
+	for i := 1; i < len(comments); i++ {
+		comments[i].ParentCommentID = comments[(i-1)/2].ID
 	}
 }
