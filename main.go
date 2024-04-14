@@ -233,6 +233,126 @@ func main() {
 	createComments()
 
 	createPostLikes()
+
+	createCommentLikes()
+
+	createPostImages()
+}
+
+func createPostImages() {
+	fileBytes, err := os.Open("post_images.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var postImagesData []*models.PostImage
+	err = json.NewDecoder(fileBytes).Decode(&postImagesData)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var postCount int64
+	err = db.Model(&models.Post{}).Select("count(*) as post_count").Scan(&postCount).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var posts []*models.Post
+	err = db.Model(&models.Post{}).Scan(&posts).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var allPostImages []*models.PostImage
+	start := 0
+	postImagesCount := getRandomNumbers(postCount, 10)
+	for i := int64(0); i < postCount; i++ {
+		singlePostImageCount := postImagesCount[i]
+		images := postImagesData[start : start+singlePostImageCount]
+		for i, image := range images {
+			image.PostOrder = i + 1
+			image.PostID = *posts[i].ID
+			images[i] = image
+		}
+		allPostImages = append(allPostImages, images...)
+		start = start + singlePostImageCount
+	}
+
+	err = db.CreateInBatches(allPostImages, 9300).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Post images created")
+}
+
+func createCommentLikes() {
+	type CommentSchema struct {
+		ID              int64  `json:"id"`
+		PostID          int64  `json:"post_id"`
+		UserID          string `json:"user_id"`
+		ParentCommentID int64  `json:"parent_comment_id"`
+		PostAuthorID    string `json:"post_author_id"`
+	}
+	var comments []*CommentSchema
+	err := db.Table("comments c").Select("c.id", "c.post_id", "c.user_id", "c.parent_comment_id", "p.user_id as post_author_id").Joins("inner join posts p on p.id = c.post_id").Scan(&comments).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	type Followers struct {
+		UserID    string          `json:"user_id"`
+		Followers json.RawMessage `json:"followers"`
+	}
+	var userFollowers []Followers
+	err = db.Table("users as u").Select("u.id AS user_id", "json_agg(follower_id) AS followers").Joins("LEFT JOIN followers f ON u.id = f.following_id").Group("u.id").Scan(&userFollowers).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	userXFollowers := map[string][]string{}
+	for _, user := range userFollowers {
+		var followers []string
+		err := json.Unmarshal(user.Followers, &followers)
+		if err != nil {
+			log.Fatal(err)
+		}
+		userXFollowers[user.UserID] = followers
+	}
+
+	randomNumbers := getRandomNumbers(int64(len(comments)), 200)
+
+	commentLikes := []*models.CommentLike{}
+	for i, comment := range comments {
+		noOfLikes := randomNumbers[i]
+		for j := 0; j < noOfLikes; j++ {
+			commentLikes = append(commentLikes, &models.CommentLike{
+				CommentID: comment.ID,
+				LikedBy:   userXFollowers[comment.PostAuthorID][j],
+			})
+		}
+	}
+
+	err = db.CreateInBatches(commentLikes, 10000).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Comment likes generated")
+}
+
+func getRandomNumbers(size int64, maxValue int) []int {
+	rand.Seed(time.Now().UnixNano())
+
+	// Create an array to store the random numbers
+	randomNumbers := make([]int, size)
+
+	// Generate random numbers and store them in the array
+	for i := int64(0); i < size; i++ {
+		randomNumbers[i] = rand.Intn(maxValue) + 1 // Generates a random number between 1 and 200
+	}
+
+	return randomNumbers
 }
 
 func createPostLikes() {

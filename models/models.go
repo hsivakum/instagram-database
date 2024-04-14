@@ -86,12 +86,12 @@ type Post struct {
 type PostImage struct {
 	ID        int64      `gorm:"primaryKey"`
 	PostID    int64      `gorm:"index"`
-	ImageURL  string     `gorm:"not null"`
-	PostOrder int        `gorm:"default:1"`
-	CreatedAt time.Time  `gorm:"autoCreateTime"`
-	UpdatedAt *time.Time `gorm:"autoUpdateTime"`
-	DeletedAt *time.Time `gorm:"index"`
-	Post      Post       `gorm:"foreignKey:PostID"`
+	ImageURL  string     `gorm:"not null" json:"image_url"`
+	PostOrder int        `gorm:"default:1" json:"-"`
+	CreatedAt time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt *time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt *time.Time `gorm:"index" json:"deleted_at"`
+	Post      Post       `gorm:"foreignKey:PostID" json:"-"`
 }
 
 type Highlight struct {
