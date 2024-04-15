@@ -237,6 +237,147 @@ func main() {
 	createCommentLikes()
 
 	createPostImages()
+
+	createStories()
+
+	createStoryTags()
+
+	createStoryViews()
+}
+
+func createStoryViews() {
+	var stories []models.Story
+	err := db.Model(&models.Story{}).Scan(&stories).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	numbers := getRandomNumbers(int64(len(stories)), 300)
+
+	type Followers struct {
+		UserID    string          `json:"user_id"`
+		Followers json.RawMessage `json:"followers"`
+	}
+	var userFollowers []Followers
+	err = db.Table("users as u").Select("u.id AS user_id", "json_agg(follower_id) AS followers").Joins("LEFT JOIN followers f ON u.id = f.following_id").Group("u.id").Scan(&userFollowers).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	userXFollowers := map[string][]string{}
+	for _, user := range userFollowers {
+		var followers []string
+		err := json.Unmarshal(user.Followers, &followers)
+		if err != nil {
+			log.Fatal(err)
+		}
+		userXFollowers[user.UserID] = followers
+	}
+
+	var storyViews []models.StoryView
+	for i := 0; i < len(numbers); i++ {
+		followers := userXFollowers[stories[i].UserID]
+		for j, viewerID := range followers[:numbers[i]] {
+			storyViews = append(storyViews, models.StoryView{
+				StoryID:  stories[i].ID,
+				ViewerID: viewerID,
+				IsLiked: func() bool {
+					return j%2 == 0
+				}(),
+			})
+		}
+	}
+
+	err = db.CreateInBatches(storyViews, 10000).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("successfully created story views!")
+}
+
+func createStoryTags() {
+	var tags []models.HashTag
+	err := db.Model(&models.HashTag{}).Scan(&tags).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var stories []models.Story
+	err = db.Model(&models.Story{}).Scan(&stories).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	numbers := getRandomNumbers(int64(len(stories)), 3)
+
+	allStoryTags := []models.StoryTag{}
+	storyTags := map[string]models.StoryTag{}
+	for i := 0; i < len(numbers); i++ {
+		number := numbers[i]
+		randomNumbers := getRandomNumbers(int64(number), number)
+		for _, tagIndex := range randomNumbers {
+			storyTags[fmt.Sprintf("%s_%d", stories[i].ID, tags[tagIndex].ID)] = models.StoryTag{
+				StoryID: stories[i].ID,
+				TagID:   tags[tagIndex].ID,
+			}
+		}
+	}
+
+	for _, storyTag := range storyTags {
+		allStoryTags = append(allStoryTags, storyTag)
+	}
+
+	err = db.CreateInBatches(allStoryTags, 10000).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Story tags created successfully!")
+}
+
+func createStories() {
+	fileBytes, err := os.Open("stories.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var storiesData []*models.Story
+	err = json.NewDecoder(fileBytes).Decode(&storiesData)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var users []*models.User
+	err = db.Model(&models.User{}).Scan(&users).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	usersCount := int64(len(users))
+	numbers := getRandomNumbers(usersCount, 100)
+
+	allStories := []*models.Story{}
+	start := 0
+	for i := int64(0); i < usersCount; i++ {
+		storyCount := numbers[i]
+		stories := storiesData[start : start+storyCount]
+		for j, story := range stories {
+			story.ID = uuid.NewString()
+			story.UserID = users[i].ID
+			stories[j] = story
+		}
+
+		allStories = append(allStories, stories...)
+		start = start + storyCount
+	}
+
+	err = db.CreateInBatches(allStories, 10000).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Stories created successfully")
 }
 
 func createPostImages() {

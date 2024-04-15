@@ -145,14 +145,14 @@ create table highlights
 
 create table stories
 (
-    id         uuid                                  not null
+    id         uuid        default uuid_generate_v4() not null
         constraint stories_pk
             primary key,
-    user_id    uuid                                  not null
+    user_id    uuid                                   not null
         constraint stories_fk
             references users,
-    media_url  text                                  not null,
-    created_at timestamptz default current_timestamp not null,
+    media_url  text                                   not null,
+    created_at timestamptz default current_timestamp  not null,
     updated_at timestamptz,
     deleted_at timestamptz
 );

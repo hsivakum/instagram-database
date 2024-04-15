@@ -106,13 +106,17 @@ type Highlight struct {
 }
 
 type Story struct {
-	ID        string     `gorm:"primaryKey"`
-	UserID    string     `gorm:"index"`
-	MediaURL  string     `gorm:"not null"`
-	CreatedAt time.Time  `gorm:"autoCreateTime"`
-	UpdatedAt *time.Time `gorm:"autoUpdateTime"`
-	DeletedAt *time.Time `gorm:"index"`
-	User      User       `gorm:"foreignKey:UserID"`
+	ID        string     `gorm:"primaryKey,default:uuid_generate_v4()" json:"-"`
+	UserID    string     `gorm:"index" json:"-"`
+	MediaURL  string     `gorm:"not null" json:"media_url"`
+	CreatedAt time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt *time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt *time.Time `gorm:"index" json:"deleted_at"`
+	User      User       `gorm:"foreignKey:UserID" json:"-"`
+}
+
+func (s *Story) TableName() string {
+	return "stories"
 }
 
 type StoryView struct {
