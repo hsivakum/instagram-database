@@ -358,9 +358,12 @@ func createStories() {
 	numbers := getRandomNumbers(usersCount, 100)
 
 	allStories := []*models.Story{}
-	start := 0
+	start := int64(0)
 	for i := int64(0); i < usersCount; i++ {
-		storyCount := numbers[i]
+		storyCount := int64(numbers[i])
+		if users[i].HighlightsCount > storyCount {
+			storyCount = users[i].HighlightsCount
+		}
 		stories := storiesData[start : start+storyCount]
 		for j, story := range stories {
 			story.ID = uuid.NewString()
