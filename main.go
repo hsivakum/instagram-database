@@ -243,6 +243,80 @@ func main() {
 	createStoryTags()
 
 	createStoryViews()
+
+	createHighlightStories()
+}
+
+func createHighlightStories() {
+	type storyData struct {
+		UserID  string          `json:"user_id"`
+		Stories json.RawMessage `json:"stories"`
+	}
+	var storiesJson []storyData
+	err := db.Table("stories as s").Select("json_agg(json_build_object('id', s.id, 'user_id', s.user_id , 'media_url', s.media_url, 'created_at', s.created_at, 'updated_at', s.updated_at, 'deleted_at', s.deleted_at )) AS stories", "s.user_id").Group("s.user_id").Scan(&storiesJson).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	storyByUser := map[string][]models.Story{}
+	for _, story := range storiesJson {
+		var userStories []models.Story
+		err := json.Unmarshal(story.Stories, &userStories)
+		if err != nil {
+			log.Fatal(err)
+		}
+		storyByUser[story.UserID] = userStories
+	}
+
+	type highlightsData struct {
+		UserID     string          `json:"user_id"`
+		Highlights json.RawMessage `json:"highlights"`
+	}
+	var hData []highlightsData
+	err = db.Table("highlights as h").Select("json_agg(h.id) as highlights", "h.user_id").Group("h.user_id").Scan(&hData).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	userHighlights := map[string][]int64{}
+	for _, data := range hData {
+		var ids []int64
+		err := json.Unmarshal(data.Highlights, &ids)
+		if err != nil {
+			log.Fatal(err)
+		}
+		userHighlights[data.UserID] = ids
+	}
+
+	allHighlightStories := []models.HighlightsStory{}
+
+	for userID, highLights := range userHighlights {
+		stories := storyByUser[userID]
+
+		// Calculate the maximum number of stories that can be added to highlights
+		maxStories := len(stories)
+		if maxStories < len(highLights) {
+			maxStories = len(highLights)
+		}
+
+		// Randomly generate a number of stories to add to highlights
+		numStories := rand.Intn(maxStories + 1)
+
+		// Add the selected stories to highlights
+		for i := 0; i < numStories && i < len(stories) && i < len(highLights); i++ {
+			allHighlightStories = append(allHighlightStories, models.HighlightsStory{
+				HighlightID: highLights[i],
+				StoryID:     stories[i].ID,
+			})
+		}
+	}
+
+	err = db.CreateInBatches(allHighlightStories, 10000).Error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Highlights stories created!")
 }
 
 func createStoryViews() {

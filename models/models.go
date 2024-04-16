@@ -106,8 +106,8 @@ type Highlight struct {
 }
 
 type Story struct {
-	ID        string     `gorm:"primaryKey,default:uuid_generate_v4()" json:"-"`
-	UserID    string     `gorm:"index" json:"-"`
+	ID        string     `gorm:"primaryKey,default:uuid_generate_v4()" json:"id"`
+	UserID    string     `gorm:"index" json:"user_id"`
 	MediaURL  string     `gorm:"not null" json:"media_url"`
 	CreatedAt time.Time  `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt *time.Time `gorm:"autoUpdateTime" json:"updated_at"`
