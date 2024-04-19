@@ -357,3 +357,90 @@ create table post_likes
         primary key (post_id, user_id)
 );
 
+-- users
+CREATE INDEX idx_followers_count ON users (followers_count);
+CREATE INDEX idx_username ON users (username);
+
+-- businesses
+CREATE INDEX idx_businesses_user_id ON businesses (user_id);
+
+-- followers
+CREATE INDEX idx_followers_follower_id ON followers (follower_id);
+CREATE INDEX idx_followers_following_id ON followers (following_id);
+
+-- followers_activity
+CREATE INDEX idx_followers_activity_follower_id ON followers_activity (follower_id);
+CREATE INDEX idx_followers_activity_following_id ON followers_activity (following_id);
+
+-- locations
+CREATE INDEX idx_locations_name_slug ON locations (name, slug);
+
+-- posts
+CREATE INDEX idx_posts_user_id ON posts (user_id);
+CREATE INDEX idx_posts_location_id ON posts (location_id);
+CREATE INDEX idx_posts_is_sponsored ON posts (is_sponsored);
+
+-- post_images
+CREATE INDEX idx_post_images_post_id ON post_images (post_id);
+
+-- highlights
+CREATE INDEX idx_highlights_user_id ON highlights (user_id);
+
+-- stories
+CREATE INDEX idx_stories_user_id ON stories (user_id);
+
+-- story_views
+CREATE INDEX idx_story_views_story_id ON story_views (story_id);
+CREATE INDEX idx_story_views_viewer_id ON story_views (viewer_id);
+
+-- highlights_stories
+CREATE INDEX idx_highlights_stories_highlight_id ON highlights_stories (highlight_id);
+CREATE INDEX idx_highlights_stories_story_id ON highlights_stories (story_id);
+
+-- highlights_story_activity
+CREATE INDEX idx_highlights_story_activity_highlight_id ON highlights_story_activity (highlight_id);
+CREATE INDEX idx_highlights_story_activity_story_id ON highlights_story_activity (story_id);
+
+-- hash_tags
+CREATE INDEX idx_hash_tags_name ON hash_tags (name);
+
+-- post_tags
+CREATE INDEX idx_post_tags_post_id ON post_tags (post_id);
+CREATE INDEX idx_post_tags_tag_id ON post_tags (tag_id);
+
+-- story_tags
+CREATE INDEX idx_story_tags_story_id ON story_tags (story_id);
+CREATE INDEX idx_story_tags_tag_id ON story_tags (tag_id);
+
+-- block
+CREATE INDEX idx_block_user_id ON block (user_id);
+CREATE INDEX idx_block_blocked_id ON block (blocked_id);
+
+-- block_activity
+CREATE INDEX idx_block_activity_user_id ON block_activity (user_id);
+CREATE INDEX idx_block_activity_blocked_id ON block_activity (blocked_id);
+
+-- restrict
+CREATE INDEX idx_restrict_user_id ON restrict (user_id);
+CREATE INDEX idx_restrict_restrict_user_id ON restrict (restrict_user_id);
+
+-- restrict_activity
+CREATE INDEX idx_restrict_activity_user_id ON restrict_activity (user_id);
+CREATE INDEX idx_restrict_activity_restrict_user_id ON restrict_activity (restrict_user_id);
+
+-- comments
+CREATE INDEX idx_comments_post_id ON comments (post_id);
+CREATE INDEX idx_comments_user_id ON comments (user_id);
+CREATE INDEX idx_comments_parent_comment_id ON comments (parent_comment_id);
+
+-- comment_likes
+CREATE INDEX idx_comment_likes_comment_id ON comment_likes (comment_id);
+CREATE INDEX idx_comment_likes_liked_by ON comment_likes (liked_by);
+
+-- comment_activity
+CREATE INDEX idx_comment_activity_comment_id ON comment_activity (comment_id);
+CREATE INDEX idx_comment_activity_action_by ON comment_activity (action_by);
+
+-- post_likes
+CREATE INDEX idx_post_likes_post_id ON post_likes (post_id);
+CREATE INDEX idx_post_likes_user_id ON post_likes (user_id);
