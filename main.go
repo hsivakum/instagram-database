@@ -213,41 +213,67 @@ func main() {
 		allTags = append(allTags, tag)
 	}
 
+	wg := &sync.WaitGroup{}
+
+	wg.Add(2)
+
 	createUser(users)
-	createBusiness(businesss)
-	createLocations(locations)
-	createPosts(posts)
+	go createBusiness(businesss, wg)
+	go createLocations(locations, wg)
+
+	wg.Wait()
+	wg.Add(2)
+	go createPosts(posts, wg)
 
 	for _, post := range posts {
 		postCaption[post.ID] = post.Caption
 	}
-	createHashTags(tags)
+	go createHashTags(tags, wg)
+
+	wg.Wait()
+
+	wg.Add(3)
 
 	postTags := []*models.PostTag{}
-	createPostTagsConcurrently(postTags, allTags, postCaption, hashTags)
+	go createPostTagsConcurrently(postTags, allTags, postCaption, hashTags, wg)
 
-	createHighlights(highlights)
+	go createHighlights(highlights, wg)
 
-	createFollowers()
+	go createFollowers(wg)
 
-	createComments()
+	wg.Wait()
 
-	createPostLikes()
+	wg.Add(3)
 
-	createCommentLikes()
+	go createComments(wg)
 
-	createPostImages()
+	go createPostLikes(wg)
 
-	createStories()
+	go createPostImages(wg)
 
-	createStoryTags()
+	wg.Wait()
+
+	wg.Add(2)
+
+	go createCommentLikes(wg)
+
+	go createStories(wg)
+
+	wg.Wait()
+
+	wg.Add(2)
+
+	go createStoryTags(wg)
 
 	//createStoryViews()
 
-	createHighlightStories()
+	go createHighlightStories(wg)
+
+	wg.Wait()
 }
 
-func createHighlightStories() {
+func createHighlightStories(wg *sync.WaitGroup) {
+	defer wg.Done()
 	type storyData struct {
 		UserID  string          `json:"user_id"`
 		Stories json.RawMessage `json:"stories"`
@@ -370,7 +396,8 @@ func createStoryViews() {
 	log.Println("successfully created story views!")
 }
 
-func createStoryTags() {
+func createStoryTags(wg *sync.WaitGroup) {
+	defer wg.Done()
 	var tags []models.HashTag
 	err := db.Model(&models.HashTag{}).Scan(&tags).Error
 	if err != nil {
@@ -410,7 +437,8 @@ func createStoryTags() {
 	log.Println("Story tags created successfully!")
 }
 
-func createStories() {
+func createStories(wg *sync.WaitGroup) {
+	defer wg.Done()
 	fileBytes, err := os.Open("stories.json")
 	if err != nil {
 		log.Fatal(err)
@@ -457,7 +485,8 @@ func createStories() {
 	log.Println("Stories created successfully")
 }
 
-func createPostImages() {
+func createPostImages(wg *sync.WaitGroup) {
+	defer wg.Done()
 	fileBytes, err := os.Open("post_images.json")
 	if err != nil {
 		log.Fatal(err)
@@ -504,7 +533,8 @@ func createPostImages() {
 	log.Println("Post images created")
 }
 
-func createCommentLikes() {
+func createCommentLikes(wg *sync.WaitGroup) {
+	defer wg.Done()
 	type CommentSchema struct {
 		ID              int64  `json:"id"`
 		PostID          int64  `json:"post_id"`
@@ -573,7 +603,8 @@ func getRandomNumbers(size int64, maxValue int) []int {
 	return randomNumbers
 }
 
-func createPostLikes() {
+func createPostLikes(wg *sync.WaitGroup) {
+	wg.Done()
 	var posts []*models.Post
 	err := db.Model(&models.Post{}).Select("id", "likes_count", "user_id").Where("likes_count > 0").Scan(&posts).Error
 	if err != nil {
@@ -619,7 +650,8 @@ func createPostLikes() {
 	log.Println("Post likes successfully created")
 }
 
-func createFollowers() {
+func createFollowers(wg *sync.WaitGroup) {
+	defer wg.Done()
 	// Query for user IDs and their follower and following counts
 	rows, err := rawDB.Query("SELECT id, following_count, followers_count FROM users")
 	if err != nil {
@@ -706,7 +738,8 @@ SET
 	fmt.Println("Follower relationships have been generated successfully!")
 }
 
-func createComments() {
+func createComments(wg *sync.WaitGroup) {
+	defer wg.Done()
 	var commentsStore []*models.Comment
 	file, err := os.Open("comments.json")
 	if err != nil {
@@ -806,35 +839,40 @@ func createUser(users []*models.User) {
 	}
 }
 
-func createBusiness(businesses []*models.Business) {
+func createBusiness(businesses []*models.Business, wg *sync.WaitGroup) {
+	defer wg.Done()
 	tx := db.CreateInBatches(businesses, 10000)
 	if tx.Error != nil {
 		log.Fatal(tx.Error)
 	}
 }
 
-func createLocations(locations []*models.Location) {
+func createLocations(locations []*models.Location, wg *sync.WaitGroup) {
+	defer wg.Done()
 	tx := db.CreateInBatches(locations, 10000)
 	if tx.Error != nil {
 		log.Fatal(tx.Error)
 	}
 }
 
-func createPosts(posts []*models.Post) {
+func createPosts(posts []*models.Post, wg *sync.WaitGroup) {
+	defer wg.Done()
 	tx := db.CreateInBatches(posts, 4000)
 	if tx.Error != nil {
 		log.Fatal(tx.Error)
 	}
 }
 
-func createHashTags(hashTags []*models.HashTag) {
+func createHashTags(hashTags []*models.HashTag, wg *sync.WaitGroup) {
+	defer wg.Done()
 	tx := db.CreateInBatches(hashTags, 10000)
 	if tx.Error != nil {
 		log.Fatal(tx.Error)
 	}
 }
 
-func createHighlights(highlights []*models.Highlight) {
+func createHighlights(highlights []*models.Highlight, wg *sync.WaitGroup) {
+	defer wg.Done()
 	tx := db.CreateInBatches(highlights, 10000)
 	if tx.Error != nil {
 		log.Fatal(tx.Error)
@@ -848,7 +886,8 @@ func createPostTags(postTags []*models.PostTag) {
 	}
 }
 
-func createPostTagsConcurrently(postTags []*models.PostTag, allTags []string, postCaption map[*int64]string, hashTags map[string]*int64) {
+func createPostTagsConcurrently(postTags []*models.PostTag, allTags []string, postCaption map[*int64]string, hashTags map[string]*int64, parentWg *sync.WaitGroup) {
+	defer parentWg.Done()
 	resultCh := make(chan *models.PostTag)
 
 	var wg sync.WaitGroup
