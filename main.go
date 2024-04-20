@@ -242,7 +242,7 @@ func main() {
 
 	createStoryTags()
 
-	createStoryViews()
+	//createStoryViews()
 
 	createHighlightStories()
 }
